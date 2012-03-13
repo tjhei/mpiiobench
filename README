@@ -1,0 +1,2 @@
+
+Simple benchmark for parallel I/O using MPI I/O in MPI-2. Create a symlink named bin/ to a fast parallel filesystem and run with more than 16 processes (something like 128 or more is good).
