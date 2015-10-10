@@ -1,6 +1,11 @@
 #include <mpi.h>
 #include <stdio.h>
 #include <vector>
+#include <unistd.h>
+
+long totalsize =
+  //  50l *1024l*1024l*1024l; // 50gb
+  2l *1024l*1024l; // 2mb
 
 
 void test(MPI_Comm comm, char * cbnodes, long my_size, const char * filename)
@@ -25,8 +30,19 @@ void test(MPI_Comm comm, char * cbnodes, long my_size, const char * filename)
 
 
       MPI_File fh;
-      MPI_File_open(comm, const_cast<char*>(filename),
+      int err= MPI_File_open(comm, const_cast<char*>(filename),
 		    MPI_MODE_CREATE | MPI_MODE_WRONLY, info, &fh);
+      if (err!=0)
+	{
+	  char msg[MPI_MAX_ERROR_STRING];
+	  int resultlen;
+	  MPI_Error_string(err, msg, &resultlen);
+
+	  std::cerr << "MPI_File_open failed with " << err << " " << msg << std::endl;
+
+	  MPI_Abort(MPI_COMM_WORLD, 1);
+	}
+      
 
       MPI_Info infoout;
       MPI_File_get_info( fh, &infoout );
@@ -105,14 +121,22 @@ void test(MPI_Comm comm, char * cbnodes, long my_size, const char * filename)
 
 void test_n(int num_files, char * num_writers)
 {
-  long totalsize=50; //in GB
-  totalsize*=1024l*1024l*1024l;
 
   int global_myrank, global_nproc;
   MPI_Comm_rank(MPI_COMM_WORLD, &global_myrank);
   MPI_Comm_size(MPI_COMM_WORLD, &global_nproc);
+
   if (global_myrank==0)
     std::cout << "\n*** TEST num files = " << num_files << " nproc = " << global_nproc << " totalsize = " << totalsize << std::endl;
+
+  if (num_files > global_nproc)
+    {
+      if (global_myrank==0)
+	std::cerr << "can not use more files than processors!" << std::endl;
+      return;
+    }
+  
+  
   
   MPI_Comm split_comm;
   int group = global_myrank / (global_nproc/num_files);
