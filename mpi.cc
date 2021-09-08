@@ -2,13 +2,14 @@
 #include <stdio.h>
 #include <vector>
 #include <unistd.h>
+#include <iostream>
 
 long totalsize =
   //  50l *1024l*1024l*1024l; // 50gb
   2l *1024l*1024l; // 2mb
 
 
-void test(MPI_Comm comm, char * cbnodes, long my_size, const char * filename)
+void test(MPI_Comm comm, const char * cbnodes, long my_size, const char * filename)
 {
   MPI_Barrier(comm);
   int myrank, nproc;
@@ -78,7 +79,7 @@ void test(MPI_Comm comm, char * cbnodes, long my_size, const char * filename)
 
       if (myrank==0)
 	{
-	  char * data="HEADER111\n";
+	  const char * data="HEADER111\n";
 
 	  //	  std::cout << "writing header" << std::endl;
 	  MPI_File_write(fh, data, 10, MPI_CHAR, NULL);
@@ -119,7 +120,7 @@ void test(MPI_Comm comm, char * cbnodes, long my_size, const char * filename)
 
 }
 
-void test_n(int num_files, char * num_writers)
+void test_n(int num_files, const char * num_writers)
 {
 
   int global_myrank, global_nproc;
@@ -179,7 +180,7 @@ int main(int argc, char *argv[] )
 {
     MPI_Init( &argc, &argv ); 
 
-    for (int i=0;i<5;++i)
+    //    for (int i=0;i<5;++i)
       {
 
 	test_n(1, NULL);
@@ -200,7 +201,6 @@ int main(int argc, char *argv[] )
     test_n(4, "4");
     test_n(8, "4");
     test_n(16, "4");
-
 
     MPI_Finalize(); 
   return 0;
