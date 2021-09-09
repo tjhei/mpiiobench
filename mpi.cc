@@ -4,10 +4,11 @@
 #include <unistd.h>
 #include <iostream>
 
-long totalsize =
+const long totalsize =
   //  50l *1024l*1024l*1024l; // 50gb
   2l *1024l*1024l; // 2mb
 
+const bool random_data = true;
 
 void test(MPI_Comm comm, const char * cbnodes, long my_size, const char * filename)
 {
@@ -43,7 +44,7 @@ void test(MPI_Comm comm, const char * cbnodes, long my_size, const char * filena
 
 	  MPI_Abort(MPI_COMM_WORLD, 1);
 	}
-      
+
 
       MPI_Info infoout;
       MPI_File_get_info( fh, &infoout );
@@ -70,6 +71,10 @@ void test(MPI_Comm comm, const char * cbnodes, long my_size, const char * filena
       MPI_Info_free(&info);  /* free the info object */
 
       std::vector<char> data(my_size,'_');
+      if (random_data)
+	for (size_t i = 0; i < my_size; ++i)
+	  data[i] = 'A'+(rand()%26);
+
       data[0]='P';
       data[1]='0'+(myrank/1000)%10;
       data[2]='0'+(myrank/100)%10;
@@ -136,13 +141,13 @@ void test_n(int num_files, const char * num_writers)
 	std::cerr << "can not use more files than processors!" << std::endl;
       return;
     }
-  
-  
-  
+
+
+
   MPI_Comm split_comm;
   int group = global_myrank / (global_nproc/num_files);
   MPI_Comm_split(MPI_COMM_WORLD, group, global_myrank, &split_comm);
-  
+
   int myrank, nproc;
   MPI_Comm_rank(split_comm, &myrank);
   MPI_Comm_size(split_comm, &nproc);
@@ -168,17 +173,21 @@ void test_n(int num_files, const char * num_writers)
   sleep(5);
 
   if (global_myrank==0)
-    std::cout 
+    std::cout
       << "> RESULT nfiles= " <<num_files  << " write took " << difftime << " for " << totalsize/1024/1024 << " MB. ="
       << totalsize/1024.0/1024.0/difftime << " MB/s"<< std::endl;
 
-  
+
 
 }
 
 int main(int argc, char *argv[] )
 {
-    MPI_Init( &argc, &argv ); 
+    MPI_Init( &argc, &argv );
+
+    int global_myrank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &global_myrank);
+  srand (time(NULL) xor global_myrank);
 
     //    for (int i=0;i<5;++i)
       {
@@ -187,7 +196,7 @@ int main(int argc, char *argv[] )
 	test_n(4, NULL);
 	test_n(8, NULL);
 	test_n(16, NULL);
-      }    
+      }
 
     test_n(1, "1");
     test_n(4, "1");
@@ -202,7 +211,7 @@ int main(int argc, char *argv[] )
     test_n(8, "4");
     test_n(16, "4");
 
-    MPI_Finalize(); 
+    MPI_Finalize();
   return 0;
-  
+
 }
