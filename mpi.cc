@@ -26,7 +26,8 @@ void test(MPI_Comm comm, const char * cbnodes, long my_size, const char * filena
      during collective I/O */
   if (cbnodes)
       MPI_Info_set(info, "cb_nodes", cbnodes);
-  else MPI_Info_set(info, "cb_nodes", "128");
+  else
+      MPI_Info_set(info, "cb_nodes", "128");
 
       MPI_Info_set(info, "cb_config_list", "*");
 
@@ -98,7 +99,7 @@ void test(MPI_Comm comm, const char * cbnodes, long my_size, const char * filena
 
       double t1 = MPI_Wtime();
       //      std::cout << myrank << ": writing" << std::endl;
-      MPI_File_write_ordered(fh, &data[0], my_size, MPI_CHAR, NULL);
+      MPI_File_write_ordered(fh, &data[0], my_size, MPI_BYTE, NULL);
       //      std::cout << myrank << ": writing done" << std::endl;
 
       MPI_Barrier(comm);
