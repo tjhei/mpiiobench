@@ -10,6 +10,31 @@ const long totalsize =
 
 const bool random_data = true;
 
+// taken from
+// https://github.com/jeffhammond/BigMPI/blob/5300b18cc8ec1b2431bf269ee494054ee7bd9f72/src/type_contiguous_x.c#L74
+// with modifications (MIT license)
+void make_large_MPI_type(MPI_Count size, MPI_Datatype *destination)
+{
+  const MPI_Count max_signed_int = (1U << 31)-1;
+
+  MPI_Count n_chunks = size/max_signed_int;
+  MPI_Count n_bytes_remainder = size%max_signed_int;
+
+  MPI_Datatype chunks;
+  MPI_Type_vector(n_chunks, max_signed_int, max_signed_int, MPI_BYTE, &chunks);
+
+  MPI_Datatype remainder;
+  MPI_Type_contiguous(n_bytes_remainder, MPI_BYTE, &remainder);
+
+  int blocklengths[2]       = {1,1};
+  MPI_Aint displacements[2] = {0,static_cast<MPI_Aint>(n_chunks)*max_signed_int};
+  MPI_Datatype types[2]     = {chunks,remainder};
+  MPI_Type_create_struct(2, blocklengths, displacements, types, destination);
+
+  MPI_Type_free(&chunks);
+  MPI_Type_free(&remainder);
+}
+
 void test(MPI_Comm comm, const char * cbnodes, long my_size, const char * filename)
 {
   MPI_Barrier(comm);
@@ -99,7 +124,15 @@ void test(MPI_Comm comm, const char * cbnodes, long my_size, const char * filena
 
       double t1 = MPI_Wtime();
       //      std::cout << myrank << ": writing" << std::endl;
-      MPI_File_write_ordered(fh, &data[0], my_size, MPI_BYTE, NULL);
+      if (my_size < (1U<<31))
+	MPI_File_write_ordered(fh, &data[0], my_size, MPI_BYTE, NULL);
+      else
+	{
+	  MPI_Datatype bigtype;
+	  make_large_MPI_type(my_size, &bigtype);
+	  MPI_File_write_ordered(fh, &data[0], 1, bigtype, NULL);
+	  MPI_Type_free(&bigtype);
+	}
       //      std::cout << myrank << ": writing done" << std::endl;
 
       MPI_Barrier(comm);
