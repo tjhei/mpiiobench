@@ -35,7 +35,7 @@ void make_large_MPI_type(MPI_Count size, MPI_Datatype *destination)
   MPI_Type_free(&remainder);
 }
 
-void test(MPI_Comm comm, const char * cbnodes, long my_size, const char * filename)
+void test(MPI_Comm comm, const char * cbnodes, std::uint64_t my_size, const char * filename)
 {
   MPI_Barrier(comm);
   int myrank, nproc;
@@ -147,8 +147,8 @@ void test(MPI_Comm comm, const char * cbnodes, long my_size, const char * filena
       double maxtime=0;
       MPI_Reduce(&ttime, &maxtime, 1, MPI_DOUBLE, MPI_MAX, 0, comm);
 
-      long bytes_written;
-      MPI_Reduce(&my_size, &bytes_written, 1, MPI_LONG, MPI_SUM, 0, comm);
+      std::uint64_t bytes_written;
+      MPI_Reduce(&my_size, &bytes_written, 1, MPI_UINT64_T, MPI_SUM, 0, comm);
       bytes_written += 10;
 
 
@@ -198,7 +198,7 @@ void test_n(int num_files, const char * num_writers)
   MPI_Barrier(MPI_COMM_WORLD);
   double t1 = MPI_Wtime();
 
-  long mysize = totalsize / global_nproc;
+  std::uint64_t mysize = totalsize / global_nproc;
   test(split_comm, num_writers, mysize, filename);
 
   MPI_Barrier(MPI_COMM_WORLD);
