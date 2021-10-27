@@ -30,6 +30,7 @@ void make_large_MPI_type(MPI_Count size, MPI_Datatype *destination)
   MPI_Aint displacements[2] = {0,static_cast<MPI_Aint>(n_chunks)*max_signed_int};
   MPI_Datatype types[2]     = {chunks,remainder};
   MPI_Type_create_struct(2, blocklengths, displacements, types, destination);
+  MPI_Type_commit(destination);
 
   MPI_Type_free(&chunks);
   MPI_Type_free(&remainder);
