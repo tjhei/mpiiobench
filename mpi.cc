@@ -4,9 +4,9 @@
 #include <unistd.h>
 #include <iostream>
 
-const long totalsize =
-  //  50l *1024l*1024l*1024l; // 50gb
-  2l *1024l*1024l; // 2mb
+const std::uint64_t totalsize =
+      10ULL * 1024*1024*1024; // 50gb
+//2ULL *1024l*1024l; // 2mb
 
 const bool random_data = true;
 
