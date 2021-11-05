@@ -131,7 +131,9 @@ void test(MPI_Comm comm, const char * cbnodes, std::uint64_t my_size, const char
 	{
 	  MPI_Datatype bigtype;
 	  make_large_MPI_type(my_size, &bigtype);
-	  MPI_File_write_ordered(fh, &data[0], 1, bigtype, NULL);
+	  int ierr=MPI_File_write_ordered(fh, &data[0], 1, bigtype, NULL);
+	  if (err!=0)
+	    MPI_Abort(MPI_COMM_WORLD, err);
 	  MPI_Type_free(&bigtype);
 	}
       //      std::cout << myrank << ": writing done" << std::endl;
