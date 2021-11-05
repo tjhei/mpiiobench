@@ -4,8 +4,10 @@
 #include <unistd.h>
 #include <iostream>
 
-const std::uint64_t totalsize =
-      10ULL * 1024*1024*1024; // 50gb
+const std::uint64_t one_gb =1ULL * 1024*1024*1024;
+
+//const std::uint64_t totalsize =
+//      10ULL * 1024*1024*1024; // 50gb
 //2ULL *1024l*1024l; // 2mb
 
 const bool random_data = true;
@@ -129,6 +131,7 @@ void test(MPI_Comm comm, const char * cbnodes, std::uint64_t my_size, const char
 	MPI_File_write_ordered(fh, &data[0], my_size, MPI_BYTE, NULL);
       else
 	{
+	  if (myrank==0) std::cout << "using bigtype!" << std::endl;
 	  MPI_Datatype bigtype;
 	  make_large_MPI_type(my_size, &bigtype);
 	  int ierr=MPI_File_write_ordered(fh, &data[0], 1, bigtype, NULL);
@@ -162,7 +165,7 @@ void test(MPI_Comm comm, const char * cbnodes, std::uint64_t my_size, const char
 
 }
 
-void test_n(int num_files, const char * num_writers)
+void test_n(std::uint64_t totalsize, int num_files, const char * num_writers)
 {
 
   int global_myrank, global_nproc;
@@ -195,8 +198,7 @@ void test_n(int num_files, const char * num_writers)
   if (myrank==0)
     std::cout << "rank 0 of group " << group << " with " << nproc << " members:" << filename << std::endl;
 
-  sleep(5);
-
+  sleep(2);
 
   MPI_Barrier(MPI_COMM_WORLD);
   double t1 = MPI_Wtime();
@@ -226,29 +228,20 @@ int main(int argc, char *argv[] )
   MPI_Comm_rank(MPI_COMM_WORLD, &global_myrank);
   srand (time(NULL) xor global_myrank);
 
-    //    for (int i=0;i<5;++i)
-      {
+  int n_files = 1;
+  if (argc>1)
+    n_files = atoi(argv[1]);
+  
+  if (global_myrank == 0)
+    std::cout << "*** n_files = " << n_files << std::endl;
 
-	test_n(1, NULL);
-	test_n(4, NULL);
-	test_n(8, NULL);
-	test_n(16, NULL);
-      }
+  for (int i=1;i<512;i*=2)
+    {
+      std::uint64_t totalsize = i*one_gb;
+      test_n(totalsize, n_files, NULL);
+    }
 
-    test_n(1, "1");
-    test_n(4, "1");
-    test_n(8, "1");
-    test_n(16, "1");
-    test_n(1, "2");
-    test_n(4, "2");
-    test_n(8, "2");
-    test_n(16, "2");
-    test_n(1, "4");
-    test_n(4, "4");
-    test_n(8, "4");
-    test_n(16, "4");
-
-    MPI_Finalize();
+  MPI_Finalize();
   return 0;
 
 }
