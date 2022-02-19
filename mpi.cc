@@ -38,7 +38,7 @@ void make_large_MPI_type(MPI_Count size, MPI_Datatype *destination)
   MPI_Type_free(&remainder);
 }
 
-void write_file(MPI_Comm comm, const char * cbnodes, std::vector<char> my_data, const char * filename)
+void write_file(MPI_Comm comm, const char * cbnodes, std::vector<char> &my_data, const char * filename)
 {
   int myrank, nproc;
   MPI_Comm_rank(comm, &myrank);
@@ -121,9 +121,6 @@ void write_file(MPI_Comm comm, const char * cbnodes, std::vector<char> my_data, 
 	MPI_Abort(MPI_COMM_WORLD, err);
       MPI_Type_free(&bigtype);
     }
-
-  MPI_Barrier(comm);
-
   MPI_File_close( &fh );
   double ttime = MPI_Wtime()-t1;
 
