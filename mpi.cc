@@ -12,30 +12,42 @@ const std::uint64_t one_gb =1ULL * 1024*1024*1024;
 
 const bool random_data = true;
 
+#define  AssertThrowMPI(ierr) \
+  if (ierr!=MPI_SUCCESS) \
+{\
+  std::cerr << "MPI error " << ierr << " in line " << __LINE__ << std::endl;\
+  MPI_Abort(MPI_COMM_WORLD, ierr);						\
+}
+
 // taken from
 // https://github.com/jeffhammond/BigMPI/blob/5300b18cc8ec1b2431bf269ee494054ee7bd9f72/src/type_contiguous_x.c#L74
 // with modifications (MIT license)
 void make_large_MPI_type(MPI_Count size, MPI_Datatype *destination)
 {
+  int ierr;
   const MPI_Count max_signed_int = (1U << 31)-1;
 
   MPI_Count n_chunks = size/max_signed_int;
   MPI_Count n_bytes_remainder = size%max_signed_int;
 
   MPI_Datatype chunks;
-  MPI_Type_vector(n_chunks, max_signed_int, max_signed_int, MPI_BYTE, &chunks);
+  ierr = MPI_Type_vector(n_chunks, max_signed_int, max_signed_int, MPI_BYTE, &chunks);
+  AssertThrowMPI(ierr);
 
   MPI_Datatype remainder;
-  MPI_Type_contiguous(n_bytes_remainder, MPI_BYTE, &remainder);
+  ierr = MPI_Type_contiguous(n_bytes_remainder, MPI_BYTE, &remainder);
+  AssertThrowMPI(ierr);
 
   int blocklengths[2]       = {1,1};
   MPI_Aint displacements[2] = {0,static_cast<MPI_Aint>(n_chunks)*max_signed_int};
   MPI_Datatype types[2]     = {chunks,remainder};
-  MPI_Type_create_struct(2, blocklengths, displacements, types, destination);
-  MPI_Type_commit(destination);
+  ierr = MPI_Type_create_struct(2, blocklengths, displacements, types, destination);
+  ierr = MPI_Type_commit(destination);
+  AssertThrowMPI(ierr);
 
-  MPI_Type_free(&chunks);
-  MPI_Type_free(&remainder);
+  ierr = MPI_Type_free(&chunks);
+  ierr = MPI_Type_free(&remainder);
+  AssertThrowMPI(ierr);
 }
 
 void write_file(MPI_Comm comm, const char * cbnodes, std::vector<char> &my_data, const char * filename)
@@ -209,6 +221,128 @@ void test_n(std::uint64_t totalsize, int num_files, const char * num_writers)
   sleep(5);
 }
 
+void show_info()
+{
+  int ver, subver;
+  MPI_Get_version(&ver, &subver);
+
+  std::cout << "MPI version " << ver << "." << subver <<  std::endl;
+
+#ifdef MPI_MAX_LIBRARY_VERSION_STRING
+	int len;
+	char mpi_lib_ver[MPI_MAX_LIBRARY_VERSION_STRING];
+
+	MPI_Get_library_version(mpi_lib_ver, &len);
+	std::cout << "MPI library version " << mpi_lib_ver << std::endl;
+#endif
+
+#ifdef MPICH2_VERSION
+	std::cout << "MPICH2_VERSION " << MPICH2_VERSION << std::endl;
+#endif 
+#ifdef OMPI_MAJOR_VERSION
+	std::cout << "OMPI version "
+		  << OMPI_MAJOR_VERSION << "."
+		  << OMPI_MINOR_VERSION << "."
+		  << OMPI_RELEASE_VERSION  << std::endl;
+#endif
+}
+
+void
+test_create_data_type(const std::uint64_t n_bytes, int myrank)
+{
+  MPI_Datatype bigtype;
+  make_large_MPI_type(n_bytes, &bigtype);
+
+  if (myrank==0)
+    std::cout << "Test creating big data type: n_bytes=" << n_bytes;
+
+  int size32;
+  int ierr = MPI_Type_size(bigtype, &size32);
+  AssertThrowMPI(ierr);
+
+  if (myrank==0)
+    {
+      if (size32 == MPI_UNDEFINED)
+	std::cout << " size32=UNDEFINED (too big)";
+      else
+	std::cout << " size32=" << size32;
+    }
+  
+  MPI_Count size64 = -1;
+#ifdef WITH_MPI3
+  ierr = MPI_Type_size_x(bigtype, &size64);
+  AssertThrowMPI(ierr);
+#endif
+  
+  if (myrank==0)
+    std::cout << " size64=" << size64 << std::endl;
+
+  MPI_Type_free(&bigtype);
+}
+
+
+
+void
+test_send_recv()
+{
+  MPI_Comm comm = MPI_COMM_WORLD;
+  int        myid;
+  MPI_Comm_rank(comm, &myid);
+  
+  const std::uint64_t n_bytes = (1ULL << 32) + 5;
+  MPI_Datatype bigtype;
+  make_large_MPI_type(n_bytes, &bigtype);
+
+  if (myid == 0)
+    {
+      std::vector<char> buffer(n_bytes, 'A');
+      buffer[n_bytes - 1] = 'B';
+      int ierr = MPI_Send(buffer.data(), 1, bigtype, 1 /* dest */, 0 /* tag */, comm);
+      AssertThrowMPI(ierr);
+    }
+  else if (myid == 1)
+    {
+      std::vector<char> buffer(n_bytes, '?');
+      int ierr = MPI_Recv(buffer.data(),
+                          1,
+                          bigtype,
+                          0 /* src */,
+                          0 /* tag */,
+                          comm,
+                          MPI_STATUS_IGNORE);
+      AssertThrowMPI(ierr);
+
+
+      if (buffer[0] != 'A' || buffer[n_bytes - 1] != 'B')
+	std::cerr << "MPI RECEIVE WAS INVALID." << std::endl;
+    }
+
+  MPI_Type_free(&bigtype);
+  
+  if (myid==0)
+    std::cout << "TEST big send_recv: OK" << std::endl;
+}
+
+void test_write()
+{
+  MPI_Comm comm = MPI_COMM_WORLD;
+  int        myid;
+  MPI_Comm_rank(comm, &myid);
+  if (myid==0)
+    std::cout << "TEST write..." << std::endl;
+
+  std::size_t my_size = (1ULL << 32) + myid;
+  std::vector<char> my_data(my_size,'_');
+
+  write_file(MPI_COMM_WORLD,
+	     nullptr,
+	     my_data,
+	     "tempfile");
+
+  if (myid==0)
+    std::cout << "TEST write: OK" << std::endl;
+}
+
 int main(int argc, char *argv[] )
 {
   MPI_Init( &argc, &argv );
@@ -217,22 +351,39 @@ int main(int argc, char *argv[] )
   MPI_Comm_rank(MPI_COMM_WORLD, &global_myrank);
   srand (time(NULL) xor global_myrank);
 
-  int n_files = 1;
-  const char *num_writers = nullptr;
-  if (argc>1)
-    n_files = atoi(argv[1]);
+  if (global_myrank==0)
+    show_info();
 
-  if (argc>2)
-    num_writers = argv[2];
+  MPI_Barrier(MPI_COMM_WORLD);
+
+  // 1
+  test_create_data_type(1ULL << 33, global_myrank);
+
+  // 2
+  test_send_recv();
+
+  // 3
+  test_write();
+  // write
+
+  // optional big write (intel bug)
   
-  if (global_myrank == 0)
-    std::cout << "*** n_files = " << n_files
-	      << " writers: " << ((num_writers)?num_writers:"default") << std::endl;
-
-  for (int i=1;i<512;i*=2)
+  
+  int n_files = 1;
+  if (argc>1)
     {
-      std::uint64_t totalsize = i*one_gb;
-      test_n(totalsize, n_files, num_writers);
+      const char *num_writers = nullptr;
+      if (argc>2)
+	num_writers = argv[2];
+      if (global_myrank == 0)
+	std::cout << "*** n_files = " << n_files
+		  << " writers: " << ((num_writers)?num_writers:"default") << std::endl;
+
+      for (int i=1;i<512;i*=2)
+	{
+	  std::uint64_t totalsize = i*one_gb;
+	  test_n(totalsize, n_files, num_writers);
+	}
     }
 
   MPI_Finalize();
