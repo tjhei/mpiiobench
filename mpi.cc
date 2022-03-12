@@ -112,12 +112,11 @@ void write_file(MPI_Comm comm, const char * cbnodes, std::vector<char> &my_data,
       
   size_t my_size = my_data.size();
   const MPI_Offset my_global_file_position = 10 + myrank * my_size;
-  /*
+
   if (my_size < (1ULL<<31))
-    MPI_File_write_ordered(fh, &my_data[0], my_size, MPI_BYTE, NULL);
-    */
-  if (my_size < (1ULL<<31))
-    MPI_File_write_at(fh, my_global_file_position, &my_data[0], my_size, MPI_BYTE, NULL);
+    //    MPI_File_write_ordered(fh, &my_data[0], my_size, MPI_BYTE, NULL);
+    //    MPI_File_write_at(fh, my_global_file_position, &my_data[0], my_size, MPI_BYTE, NULL);
+    MPI_File_write_at_all(fh, my_global_file_position, &my_data[0], my_size, MPI_BYTE, NULL);
 
   else
     {
@@ -125,9 +124,11 @@ void write_file(MPI_Comm comm, const char * cbnodes, std::vector<char> &my_data,
       MPI_Datatype bigtype;
       make_large_MPI_type(my_size, &bigtype);
       //      int ierr=MPI_File_write_ordered(fh, &my_data[0], 1, bigtype, NULL);
-      int ierr = MPI_File_write_at(fh, my_global_file_position, &my_data[0], 1, bigtype, NULL);
-      if (ierr!=0)
+      //      int ierr = MPI_File_write_at(fh, my_global_file_position, &my_data[0], 1, bigtype, NULL);
+      int ierr = MPI_File_write_at_all(fh, my_global_file_position, &my_data[0], 1, bigtype, NULL);
+      if (ierr!=0)       
 	MPI_Abort(MPI_COMM_WORLD, err);
+      
       MPI_Type_free(&bigtype);
     }
   MPI_File_close( &fh );
